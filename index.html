@@ -1,26 +1,883 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Frontier Ledger</title>
-  <link rel="stylesheet" href="style.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontier Ledger - Accounts Payable Automation</title>
+    <link rel="stylesheet" href="frontier-ledger.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body>
-  <header>
-    <h1>Frontier Ledger</h1>
-  </header>
+    <!-- Navigation -->
+    <nav class="main-nav">
+        <div class="nav-container">
+            <div class="logo-container">
+                <svg class="logo-mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="5" y="5" width="90" height="90" rx="12" fill="none" stroke="#4B2E1F" stroke-width="4"/>
+                    <path d="M 50 30 L 65 55 L 55 55 L 60 70 L 50 70 L 40 70 L 45 55 L 35 55 Z" fill="#4B2E1F"/>
+                    <path d="M 30 60 L 40 45 L 50 55 L 60 45 L 70 60" stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <div class="logo-text">
+                    <span class="logo-frontier">FRONTIER</span>
+                    <span class="logo-ledger">LEDGER</span>
+                </div>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="#dashboard" class="nav-link active" onclick="showScreen('dashboard')">Dashboard</a></li>
+                <li><a href="#invoices" class="nav-link" onclick="showScreen('invoices')">Invoices</a></li>
+                <li><a href="#approvals" class="nav-link" onclick="showScreen('approvals')">Approvals</a></li>
+                <li><a href="#payments" class="nav-link" onclick="showScreen('payments')">Payments</a></li>
+                <li><a href="#vendors" class="nav-link" onclick="showScreen('vendors')">Vendors</a></li>
+                <li><a href="#close" class="nav-link" onclick="showScreen('close')">Close</a></li>
+                <li><a href="#settings" class="nav-link" onclick="showScreen('settings')">Settings</a></li>
+            </ul>
+            <div class="nav-actions">
+                <button class="btn-secondary">Switch Client</button>
+                <div class="user-menu">
+                    <span class="user-name">John Doe</span>
+                    <div class="user-avatar">JD</div>
+                </div>
+            </div>
+        </div>
+    </nav>
 
-  <main>
-    <section id="hero">
-      <h2>AI-Powered Accounts Payable Automation for SMBs</h2>
-      <p>Automate your invoice processing, reduce errors, and simplify month-end close.</p>
-      <button>Get Started</button>
-    </section>
-  </main>
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Dashboard Screen -->
+        <section id="dashboard" class="screen active">
+            <div class="screen-header">
+                <h1>Dashboard</h1>
+                <div class="header-actions">
+                    <button class="btn-primary">+ New Invoice</button>
+                    <button class="btn-secondary">Build Payment Run</button>
+                </div>
+            </div>
 
-  <footer>
-    <p>&copy; 2025 Frontier Ledger</p>
-  </footer>
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-label">Awaiting Approval</div>
+                    <div class="kpi-value">24</div>
+                    <div class="kpi-change positive">-3 from yesterday</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Due This Week</div>
+                    <div class="kpi-value">$12,450</div>
+                    <div class="kpi-change">8 invoices</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Exceptions</div>
+                    <div class="kpi-value">5</div>
+                    <div class="kpi-change negative">+2 new</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Avg Cycle Time</div>
+                    <div class="kpi-value">2.4 days</div>
+                    <div class="kpi-change positive">0.3 days faster</div>
+                </div>
+            </div>
+
+            <div class="dashboard-content">
+                <div class="dashboard-section">
+                    <h2>Recent Activity</h2>
+                    <div class="activity-list">
+                        <div class="activity-item">
+                            <div class="activity-icon">INV</div>
+                            <div class="activity-details">
+                                <div class="activity-title">Invoice #2401 from Acme Corp approved</div>
+                                <div class="activity-meta">2 hours ago by Sarah Johnson</div>
+                            </div>
+                            <div class="activity-amount">$1,250.00</div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-icon">PAY</div>
+                            <div class="activity-details">
+                                <div class="activity-title">Payment run #45 completed</div>
+                                <div class="activity-meta">5 hours ago by System</div>
+                            </div>
+                            <div class="activity-amount">$8,920.00</div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-icon">EXC</div>
+                            <div class="activity-details">
+                                <div class="activity-title">Exception flagged: Duplicate invoice detected</div>
+                                <div class="activity-meta">1 day ago by AI Engine</div>
+                            </div>
+                            <span class="badge badge-warning">Needs Review</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-section">
+                    <h2>AP Aging Summary</h2>
+                    <div class="aging-chart">
+                        <div class="aging-bar">
+                            <div class="aging-segment current" style="width: 45%">
+                                <span class="aging-label">Current</span>
+                                <span class="aging-amount">$45,200</span>
+                            </div>
+                            <div class="aging-segment days-30" style="width: 30%">
+                                <span class="aging-label">1-30</span>
+                                <span class="aging-amount">$30,100</span>
+                            </div>
+                            <div class="aging-segment days-60" style="width: 15%">
+                                <span class="aging-label">31-60</span>
+                                <span class="aging-amount">$15,000</span>
+                            </div>
+                            <div class="aging-segment days-90" style="width: 10%">
+                                <span class="aging-label">60+</span>
+                                <span class="aging-amount">$10,000</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Invoice Inbox Screen -->
+        <section id="invoices" class="screen">
+            <div class="screen-header">
+                <h1>Invoice Inbox</h1>
+                <div class="header-actions">
+                    <button class="btn-primary">+ Upload Invoice</button>
+                    <button class="btn-secondary">Email Address</button>
+                    <button class="btn-secondary">Bulk Actions</button>
+                </div>
+            </div>
+
+            <div class="filter-bar">
+                <div class="filter-group">
+                    <button class="filter-chip active">All (156)</button>
+                    <button class="filter-chip">New (12)</button>
+                    <button class="filter-chip">Needs Coding (8)</button>
+                    <button class="filter-chip">Waiting Approval (24)</button>
+                    <button class="filter-chip">Exceptions (5)</button>
+                    <button class="filter-chip">Ready to Pay (89)</button>
+                    <button class="filter-chip">Paid (18)</button>
+                </div>
+                <div class="search-bar">
+                    <input type="text" placeholder="Search invoices..." class="search-input">
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox"></th>
+                            <th>Invoice #</th>
+                            <th>Vendor</th>
+                            <th>Date</th>
+                            <th>Due Date</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Assigned To</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><input type="checkbox"></td>
+                            <td class="mono">INV-2401</td>
+                            <td>Acme Corporation</td>
+                            <td>Oct 12, 2025</td>
+                            <td>Nov 11, 2025</td>
+                            <td class="mono">$1,250.00</td>
+                            <td><span class="badge badge-success">Approved</span></td>
+                            <td>Sarah J.</td>
+                            <td><button class="btn-link" onclick="showScreen('invoice-detail')">View</button></td>
+                        </tr>
+                        <tr>
+                            <td><input type="checkbox"></td>
+                            <td class="mono">INV-2402</td>
+                            <td>Office Supplies Plus</td>
+                            <td>Oct 13, 2025</td>
+                            <td>Nov 12, 2025</td>
+                            <td class="mono">$485.50</td>
+                            <td><span class="badge badge-warning">Needs Coding</span></td>
+                            <td>Mike R.</td>
+                            <td><button class="btn-link" onclick="showScreen('invoice-detail')">View</button></td>
+                        </tr>
+                        <tr>
+                            <td><input type="checkbox"></td>
+                            <td class="mono">INV-2403</td>
+                            <td>Tech Services Inc</td>
+                            <td>Oct 13, 2025</td>
+                            <td>Oct 28, 2025</td>
+                            <td class="mono">$3,200.00</td>
+                            <td><span class="badge badge-info">Waiting Approval</span></td>
+                            <td>Emma L.</td>
+                            <td><button class="btn-link" onclick="showScreen('invoice-detail')">View</button></td>
+                        </tr>
+                        <tr class="row-alert">
+                            <td><input type="checkbox"></td>
+                            <td class="mono">INV-2404</td>
+                            <td>Widget Company</td>
+                            <td>Oct 14, 2025</td>
+                            <td>Oct 29, 2025</td>
+                            <td class="mono">$875.00</td>
+                            <td><span class="badge badge-danger">Exception</span></td>
+                            <td>System</td>
+                            <td><button class="btn-link" onclick="showScreen('invoice-detail')">Review</button></td>
+                        </tr>
+                        <tr>
+                            <td><input type="checkbox"></td>
+                            <td class="mono">INV-2405</td>
+                            <td>Mountain Logistics</td>
+                            <td>Oct 14, 2025</td>
+                            <td>Nov 13, 2025</td>
+                            <td class="mono">$2,150.00</td>
+                            <td><span class="badge badge-primary">Ready to Pay</span></td>
+                            <td>Sarah J.</td>
+                            <td><button class="btn-link" onclick="showScreen('invoice-detail')">View</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Invoice Detail Screen -->
+        <section id="invoice-detail" class="screen">
+            <div class="screen-header">
+                <div>
+                    <button class="btn-link" onclick="showScreen('invoices')">&larr; Back to Invoices</button>
+                    <h1>Invoice Detail: INV-2403</h1>
+                </div>
+                <div class="header-actions">
+                    <button class="btn-danger">Reject</button>
+                    <button class="btn-secondary">Send for Approval</button>
+                    <button class="btn-primary">Approve</button>
+                </div>
+            </div>
+
+            <div class="split-view">
+                <div class="split-main">
+                    <div class="alert alert-info">
+                        <strong>Notice:</strong> This amount is 25% higher than average for this vendor
+                    </div>
+
+                    <div class="form-card">
+                        <h3>Invoice Information</h3>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Vendor</label>
+                                <input type="text" value="Tech Services Inc" class="form-input">
+                            </div>
+                            <div class="form-group">
+                                <label>Invoice Number</label>
+                                <input type="text" value="INV-2403" class="form-input mono">
+                            </div>
+                            <div class="form-group">
+                                <label>Invoice Date</label>
+                                <input type="date" value="2025-10-13" class="form-input">
+                            </div>
+                            <div class="form-group">
+                                <label>Due Date</label>
+                                <input type="date" value="2025-10-28" class="form-input">
+                            </div>
+                            <div class="form-group">
+                                <label>Payment Terms</label>
+                                <select class="form-input">
+                                    <option>Net 15</option>
+                                    <option>Net 30</option>
+                                    <option>Net 60</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Amount</label>
+                                <input type="text" value="$3,200.00" class="form-input mono">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-card">
+                        <div class="card-header-row">
+                            <h3>Line Items</h3>
+                            <button class="btn-secondary btn-sm">+ Add Line</button>
+                        </div>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Description</th>
+                                    <th>GL Account</th>
+                                    <th>Cost Center</th>
+                                    <th>Quantity</th>
+                                    <th>Unit Price</th>
+                                    <th>Total</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>IT Support Services</td>
+                                    <td>
+                                        <select class="form-input-sm">
+                                            <option>5100 - IT Services</option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select class="form-input-sm">
+                                            <option>ADMIN</option>
+                                        </select>
+                                    </td>
+                                    <td class="mono">20</td>
+                                    <td class="mono">$160.00</td>
+                                    <td class="mono">$3,200.00</td>
+                                    <td><button class="btn-link-danger">Remove</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="form-card">
+                        <h3>PDF Preview</h3>
+                        <div class="pdf-preview">
+                            <div class="pdf-placeholder">
+                                <p>PDF document would be displayed here</p>
+                                <button class="btn-secondary">Download PDF</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="split-sidebar">
+                    <div class="sidebar-card">
+                        <h4>Status</h4>
+                        <span class="badge badge-info badge-lg">Waiting Approval</span>
+                        <div class="status-meta">
+                            <p>Assigned to: <strong>Emma L.</strong></p>
+                            <p>Created: Oct 13, 2025 2:30 PM</p>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-card">
+                        <h4>Approvers</h4>
+                        <div class="approver-list">
+                            <div class="approver-item">
+                                <div class="approver-avatar">EL</div>
+                                <div class="approver-info">
+                                    <div class="approver-name">Emma Lopez</div>
+                                    <div class="approver-status">Pending</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-card">
+                        <h4>Comments & History</h4>
+                        <div class="comment-list">
+                            <div class="comment-item">
+                                <div class="comment-avatar">SJ</div>
+                                <div class="comment-content">
+                                    <div class="comment-header">
+                                        <strong>Sarah J.</strong>
+                                        <span class="comment-time">2h ago</span>
+                                    </div>
+                                    <p>Assigned to Emma for approval</p>
+                                </div>
+                            </div>
+                            <div class="comment-item">
+                                <div class="comment-avatar">AI</div>
+                                <div class="comment-content">
+                                    <div class="comment-header">
+                                        <strong>AI Engine</strong>
+                                        <span class="comment-time">2h ago</span>
+                                    </div>
+                                    <p>Auto-coded to GL 5100 - IT Services</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="comment-input">
+                            <textarea placeholder="Add a comment..." class="form-textarea"></textarea>
+                            <button class="btn-primary btn-sm">Post</button>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-card">
+                        <h4>Audit Trail</h4>
+                        <div class="audit-list">
+                            <div class="audit-item">
+                                <div class="audit-dot"></div>
+                                <div class="audit-content">
+                                    <div class="audit-action">Invoice uploaded</div>
+                                    <div class="audit-meta">Oct 13, 2:30 PM by System</div>
+                                </div>
+                            </div>
+                            <div class="audit-item">
+                                <div class="audit-dot"></div>
+                                <div class="audit-content">
+                                    <div class="audit-action">OCR extraction completed</div>
+                                    <div class="audit-meta">Oct 13, 2:31 PM by AI Engine</div>
+                                </div>
+                            </div>
+                            <div class="audit-item">
+                                <div class="audit-dot"></div>
+                                <div class="audit-content">
+                                    <div class="audit-action">Auto-coded to GL account</div>
+                                    <div class="audit-meta">Oct 13, 2:31 PM by AI Engine</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Approvals Screen -->
+        <section id="approvals" class="screen">
+            <div class="screen-header">
+                <h1>My Approvals</h1>
+                <div class="header-actions">
+                    <button class="btn-secondary">Bulk Approve</button>
+                </div>
+            </div>
+
+            <div class="approval-list">
+                <div class="approval-card">
+                    <div class="approval-header">
+                        <div class="approval-vendor">
+                            <h3>Tech Services Inc</h3>
+                            <span class="approval-invoice">INV-2403</span>
+                        </div>
+                        <div class="approval-amount mono">$3,200.00</div>
+                    </div>
+                    <div class="approval-details">
+                        <div class="approval-meta">
+                            <span>Due: Oct 28, 2025</span>
+                            <span>GL: 5100 - IT Services</span>
+                            <span>Cost Center: ADMIN</span>
+                        </div>
+                    </div>
+                    <div class="approval-actions">
+                        <button class="btn-secondary" onclick="showScreen('invoice-detail')">View Details</button>
+                        <button class="btn-danger">Reject</button>
+                        <button class="btn-primary">Approve</button>
+                    </div>
+                </div>
+
+                <div class="approval-card">
+                    <div class="approval-header">
+                        <div class="approval-vendor">
+                            <h3>Office Supplies Plus</h3>
+                            <span class="approval-invoice">INV-2398</span>
+                        </div>
+                        <div class="approval-amount mono">$245.80</div>
+                    </div>
+                    <div class="approval-details">
+                        <div class="approval-meta">
+                            <span>Due: Nov 5, 2025</span>
+                            <span>GL: 6200 - Office Supplies</span>
+                            <span>Cost Center: SALES</span>
+                        </div>
+                    </div>
+                    <div class="approval-actions">
+                        <button class="btn-secondary" onclick="showScreen('invoice-detail')">View Details</button>
+                        <button class="btn-danger">Reject</button>
+                        <button class="btn-primary">Approve</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Payment Run Screen -->
+        <section id="payments" class="screen">
+            <div class="screen-header">
+                <h1>Payment Runs</h1>
+                <div class="header-actions">
+                    <button class="btn-primary">+ New Payment Run</button>
+                </div>
+            </div>
+
+            <div class="form-card">
+                <h3>Build Payment Run</h3>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Payment Date</label>
+                        <input type="date" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Due Date Range</label>
+                        <input type="date" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Vendor Filter</label>
+                        <select class="form-input">
+                            <option>All Vendors</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Min Amount</label>
+                        <input type="number" class="form-input mono" placeholder="0.00">
+                    </div>
+                </div>
+                <button class="btn-primary">Generate Payment Run</button>
+            </div>
+
+            <div class="table-container">
+                <h3>Recent Payment Runs</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Run #</th>
+                            <th>Created</th>
+                            <th>Payment Date</th>
+                            <th>Invoices</th>
+                            <th>Total Amount</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="mono">PR-045</td>
+                            <td>Oct 14, 2025</td>
+                            <td>Oct 20, 2025</td>
+                            <td>12</td>
+                            <td class="mono">$8,920.00</td>
+                            <td><span class="badge badge-success">Completed</span></td>
+                            <td><button class="btn-link">View</button></td>
+                        </tr>
+                        <tr>
+                            <td class="mono">PR-044</td>
+                            <td>Oct 7, 2025</td>
+                            <td>Oct 13, 2025</td>
+                            <td>15</td>
+                            <td class="mono">$12,450.00</td>
+                            <td><span class="badge badge-success">Completed</span></td>
+                            <td><button class="btn-link">View</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Vendors Screen -->
+        <section id="vendors" class="screen">
+            <div class="screen-header">
+                <h1>Vendor Management</h1>
+                <div class="header-actions">
+                    <button class="btn-primary">+ Add Vendor</button>
+                    <button class="btn-secondary">Import from QuickBooks</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Vendor Name</th>
+                            <th>Contact</th>
+                            <th>Payment Terms</th>
+                            <th>W-9 Status</th>
+                            <th>Bank Status</th>
+                            <th>Portal Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Acme Corporation</td>
+                            <td>john@acme.com</td>
+                            <td>Net 30</td>
+                            <td><span class="badge badge-success">Complete</span></td>
+                            <td><span class="badge badge-success">Verified</span></td>
+                            <td><span class="badge badge-success">Active</span></td>
+                            <td><button class="btn-link" onclick="showScreen('vendor-portal')">View</button></td>
+                        </tr>
+                        <tr>
+                            <td>Office Supplies Plus</td>
+                            <td>billing@officesupplies.com</td>
+                            <td>Net 30</td>
+                            <td><span class="badge badge-success">Complete</span></td>
+                            <td><span class="badge badge-success">Verified</span></td>
+                            <td><span class="badge badge-info">Invited</span></td>
+                            <td><button class="btn-link" onclick="showScreen('vendor-portal')">View</button></td>
+                        </tr>
+                        <tr class="row-alert">
+                            <td>Tech Services Inc</td>
+                            <td>ap@techservices.com</td>
+                            <td>Net 15</td>
+                            <td><span class="badge badge-warning">Missing</span></td>
+                            <td><span class="badge badge-warning">Missing</span></td>
+                            <td><span class="badge badge-secondary">Not Invited</span></td>
+                            <td><button class="btn-link" onclick="showScreen('vendor-portal')">View</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Vendor Portal Screen -->
+        <section id="vendor-portal" class="screen vendor-portal-screen">
+            <div class="portal-header">
+                <div class="logo-container">
+                    <svg class="logo-mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="5" y="5" width="90" height="90" rx="12" fill="none" stroke="#4B2E1F" stroke-width="4"/>
+                        <path d="M 50 30 L 65 55 L 55 55 L 60 70 L 50 70 L 40 70 L 45 55 L 35 55 Z" fill="#4B2E1F"/>
+                        <path d="M 30 60 L 40 45 L 50 55 L 60 45 L 70 60" stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <div class="logo-text">
+                        <span class="logo-frontier">FRONTIER</span>
+                        <span class="logo-ledger">LEDGER</span>
+                    </div>
+                </div>
+                <h1>Vendor Portal</h1>
+                <p class="portal-subtitle">Welcome, Acme Corporation</p>
+            </div>
+
+            <div class="portal-content">
+                <div class="portal-card">
+                    <h2>My Invoices</h2>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Invoice #</th>
+                                <th>Date Submitted</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Payment Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="mono">INV-2401</td>
+                                <td>Oct 12, 2025</td>
+                                <td class="mono">$1,250.00</td>
+                                <td><span class="badge badge-success">Paid</span></td>
+                                <td>Oct 14, 2025</td>
+                            </tr>
+                            <tr>
+                                <td class="mono">INV-2385</td>
+                                <td>Oct 1, 2025</td>
+                                <td class="mono">$2,100.00</td>
+                                <td><span class="badge badge-success">Paid</span></td>
+                                <td>Oct 7, 2025</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="portal-card">
+                    <h2>Submit New Invoice</h2>
+                    <div class="upload-zone">
+                        <p>Drag and drop your invoice here, or click to browse</p>
+                        <button class="btn-primary">Choose File</button>
+                    </div>
+                </div>
+
+                <div class="portal-card">
+                    <h2>My Profile</h2>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Company Name</label>
+                            <input type="text" value="Acme Corporation" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label>Contact Email</label>
+                            <input type="email" value="john@acme.com" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label>Payment Terms</label>
+                            <input type="text" value="Net 30" class="form-input" disabled>
+                        </div>
+                        <div class="form-group">
+                            <label>W-9 Status</label>
+                            <span class="badge badge-success">Complete</span>
+                            <button class="btn-link">Update W-9</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Close Checklist Screen -->
+        <section id="close" class="screen">
+            <div class="screen-header">
+                <h1>Month-End Close Checklist</h1>
+                <div class="header-actions">
+                    <span class="close-date">October 2025</span>
+                    <button class="btn-secondary">Export Report</button>
+                    <button class="btn-primary">Sync to QuickBooks</button>
+                </div>
+            </div>
+
+            <div class="checklist-container">
+                <div class="checklist-section">
+                    <h3>Pre-Close Tasks</h3>
+                    <div class="checklist-item completed">
+                        <input type="checkbox" checked>
+                        <div class="checklist-content">
+                            <div class="checklist-title">All invoices coded and approved</div>
+                            <div class="checklist-meta">156 of 156 invoices processed</div>
+                        </div>
+                        <span class="badge badge-success">Complete</span>
+                    </div>
+                    <div class="checklist-item">
+                        <input type="checkbox">
+                        <div class="checklist-content">
+                            <div class="checklist-title">Resolve all exceptions</div>
+                            <div class="checklist-meta">5 exceptions remaining</div>
+                        </div>
+                        <span class="badge badge-warning">In Progress</span>
+                    </div>
+                    <div class="checklist-item">
+                        <input type="checkbox">
+                        <div class="checklist-content">
+                            <div class="checklist-title">Review AP aging report</div>
+                            <div class="checklist-meta">Last updated: Oct 14, 10:30 AM</div>
+                        </div>
+                        <button class="btn-link">View Report</button>
+                    </div>
+                </div>
+
+                <div class="checklist-section">
+                    <h3>QuickBooks Sync</h3>
+                    <div class="checklist-item completed">
+                        <input type="checkbox" checked>
+                        <div class="checklist-content">
+                            <div class="checklist-title">Sync vendors</div>
+                            <div class="checklist-meta">Last sync: Oct 14, 9:00 AM</div>
+                        </div>
+                        <span class="badge badge-success">Synced</span>
+                    </div>
+                    <div class="checklist-item completed">
+                        <input type="checkbox" checked>
+                        <div class="checklist-content">
+                            <div class="checklist-title">Sync bills</div>
+                            <div class="checklist-meta">Last sync: Oct 14, 9:05 AM</div>
+                        </div>
+                        <span class="badge badge-success">Synced</span>
+                    </div>
+                    <div class="checklist-item">
+                        <input type="checkbox">
+                        <div class="checklist-content">
+                            <div class="checklist-title">Sync payments</div>
+                            <div class="checklist-meta">Ready to sync</div>
+                        </div>
+                        <button class="btn-link">Sync Now</button>
+                    </div>
+                </div>
+
+                <div class="checklist-section">
+                    <h3>Reconciliation</h3>
+                    <div class="checklist-item">
+                        <input type="checkbox">
+                        <div class="checklist-content">
+                            <div class="checklist-title">Reconcile bank statements</div>
+                            <div class="checklist-meta">October statement pending</div>
+                        </div>
+                        <button class="btn-link">Start</button>
+                    </div>
+                    <div class="checklist-item">
+                        <input type="checkbox">
+                        <div class="checklist-content">
+                            <div class="checklist-title">Review PO variances</div>
+                            <div class="checklist-meta">3 variances to review</div>
+                        </div>
+                        <button class="btn-link">View</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Settings Screen -->
+        <section id="settings" class="screen">
+            <div class="screen-header">
+                <h1>Settings</h1>
+            </div>
+
+            <div class="settings-nav">
+                <button class="settings-tab active">Users & Roles</button>
+                <button class="settings-tab">Approval Rules</button>
+                <button class="settings-tab">Chart of Accounts</button>
+                <button class="settings-tab">Email Integration</button>
+                <button class="settings-tab">QuickBooks Sync</button>
+            </div>
+
+            <div class="settings-content">
+                <div class="form-card">
+                    <h3>Team Members</h3>
+                    <button class="btn-primary btn-sm">+ Invite User</button>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>John Doe</td>
+                                <td>john@company.com</td>
+                                <td><span class="badge badge-primary">Admin</span></td>
+                                <td><span class="badge badge-success">Active</span></td>
+                                <td><button class="btn-link">Edit</button></td>
+                            </tr>
+                            <tr>
+                                <td>Sarah Johnson</td>
+                                <td>sarah@company.com</td>
+                                <td><span class="badge badge-info">AP Clerk</span></td>
+                                <td><span class="badge badge-success">Active</span></td>
+                                <td><button class="btn-link">Edit</button></td>
+                            </tr>
+                            <tr>
+                                <td>Emma Lopez</td>
+                                <td>emma@company.com</td>
+                                <td><span class="badge badge-info">Approver</span></td>
+                                <td><span class="badge badge-success">Active</span></td>
+                                <td><button class="btn-link">Edit</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="form-card">
+                    <h3>Approval Rules</h3>
+                    <button class="btn-primary btn-sm">+ Add Rule</button>
+                    <div class="rule-list">
+                        <div class="rule-item">
+                            <div class="rule-content">
+                                <div class="rule-title">Invoices over $1,000</div>
+                                <div class="rule-description">Requires approval from Emma Lopez</div>
+                            </div>
+                            <button class="btn-link">Edit</button>
+                        </div>
+                        <div class="rule-item">
+                            <div class="rule-content">
+                                <div class="rule-title">IT Services vendor</div>
+                                <div class="rule-description">Requires approval from Mike Roberts</div>
+                            </div>
+                            <button class="btn-link">Edit</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+
+            document.getElementById(screenId).classList.add('active');
+
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+
+            const activeLink = document.querySelector(`.nav-link[href="#${screenId}"]`);
+            if (activeLink) {
+                activeLink.classList.add('active');
+            }
+
+            window.scrollTo(0, 0);
+        }
+    </script>
 </body>
 </html>
