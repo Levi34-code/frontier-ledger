@@ -1,27 +1,34 @@
-// js/app.js — pdf.js (force CDN ESM) + OCR + auto-fill
+// js/app.js — demo-stable parsing: vendor name only + robust invoice # + dates
 (() => {
   "use strict";
 
   const AUTO_SAVE_AFTER_PARSE = false;
 
-  // ✅ Force CDN (matching ESM + worker)
+  // pdf.js (force CDN ESM)
   const CDN_PDFJS_URL =
     "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.7.76/legacy/build/pdf.min.mjs";
   const CDN_WORKER_URL =
     "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.7.76/legacy/build/pdf.worker.min.mjs";
 
-  // OCR (only used if PDF has no embedded text)
+  // OCR fallback
   const TESSERACT_URL =
     "https://unpkg.com/tesseract.js@5.1.1/dist/tesseract.min.js";
 
   // ---------- utils ----------
-  const $ = (sel) => document.querySelector(sel);
+  const $ = (s) => document.querySelector(s);
+  const log = (...a) => console.log("[FL AP]", ...a);
+  const warn = (...a) => console.warn("[FL AP]", ...a);
+  const err = (...a) => console.error("[FL AP]", ...a);
+
   const normalize = (s) =>
     String(s || "")
       .replace(/\u00A0/g, " ")
-      .replace(/\s+/g, " ")
+      .replace(/[ \t]+/g, " ")
+      .replace(/inv\s*oice/gi, "invoice") // fix OCR splits like "Inv oice"
       .trim();
+
   const moneyNum = (s) => Number(String(s || "").replace(/[^0-9.]/g, "")) || 0;
+
   const escapeHtml = (s) =>
     String(s || "").replace(
       /[&<>"']/g,
@@ -34,54 +41,50 @@
           "'": "&#39;",
         }[m])
     );
-  const log = (...a) => console.log("[FL AP]", ...a);
-  const warn = (...a) => console.warn("[FL AP]", ...a);
-  const err = (...a) => console.error("[FL AP]", ...a);
 
   function toInputDate(s) {
     if (!s) return "";
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+    // Accept: mm/dd/yyyy, m/d/yy, yyyy-mm-dd, "Jan 2, 2025"
     try {
-      const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
-      let d;
-      if (m) {
-        const [, mm, dd, yy] = m;
-        const yr = yy.length === 2 ? Number(yy) + 2000 : Number(yy);
-        d = new Date(yr, Number(mm) - 1, Number(dd));
-      } else {
-        d = new Date(s);
+      const m1 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+      if (m1) {
+        const [, mm, dd, yy] = m1;
+        const yr = yy.length === 2 ? 2000 + Number(yy) : Number(yy);
+        const d = new Date(yr, Number(mm) - 1, Number(dd));
+        if (!isNaN(d)) return fmtYMD(d);
       }
-      if (isNaN(d.getTime())) return "";
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
-        2,
-        "0"
-      )}-${String(d.getDate()).padStart(2, "0")}`;
-    } catch {
-      return "";
-    }
+      const d2 = new Date(s);
+      if (!isNaN(d2)) return fmtYMD(d2);
+    } catch {}
+    return "";
+  }
+  function fmtYMD(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
   }
 
-  // ---------- pdf.js loader (force CDN ESM) ----------
+  // ---------- pdf.js loader (force CDN) ----------
   let PDFJS = null;
   async function importEsm(url) {
     const abs = new URL(url, location.href).href;
     return await import(abs);
   }
-
   async function ensurePdfJs() {
     if (PDFJS) return true;
     try {
       log("Importing pdf.js (CDN):", CDN_PDFJS_URL);
       PDFJS = await importEsm(CDN_PDFJS_URL);
       if (!PDFJS?.getDocument) throw new Error("CDN pdf.js missing exports");
-
-      // ✅ Absolute worker URL (same CDN, matching version)
       PDFJS.GlobalWorkerOptions.workerSrc = CDN_WORKER_URL;
-      log("pdf.js ready (CDN). Worker:", PDFJS.GlobalWorkerOptions.workerSrc);
+      log("pdf.js ready (CDN).");
       return true;
     } catch (e) {
       err("Failed to import pdf.js from CDN.", e);
-      alert("pdf.js failed to load from CDN. Please check your network.");
+      alert("pdf.js failed to load from CDN.");
       return false;
     }
   }
@@ -107,17 +110,16 @@
     const buf = await file.arrayBuffer();
     const pdf = await PDFJS.getDocument({ data: buf }).promise;
 
-    // Try embedded text first
+    // Embedded text first
     let text = "";
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
-      text += " " + content.items.map((it) => it.str).join(" ");
+      text += "\n" + content.items.map((it) => it.str).join(" ");
     }
     text = normalize(text);
-    log("Embedded text length:", text.length);
 
-    // OCR fallback if needed
+    // OCR fallback if no text
     if (text.length < 30) {
       await ensureTesseract();
       const status = $("#file-chosen");
@@ -125,51 +127,170 @@
       for (let i = 1; i <= pdf.numPages; i++) {
         status && (status.textContent = `OCR page ${i}/${pdf.numPages}…`);
         const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 1.5 });
+        const vp = page.getViewport({ scale: 1.5 });
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        await page.render({ canvasContext: ctx, viewport }).promise;
-
+        canvas.width = vp.width;
+        canvas.height = vp.height;
+        await page.render({ canvasContext: ctx, viewport: vp }).promise;
         const res = await window.Tesseract.recognize(canvas, "eng");
         ocrText += "\n" + (res?.data?.text || "");
       }
       text = normalize(ocrText);
-      log("OCR text length:", text.length);
     }
 
     return text;
   }
 
-  // ---------- Heuristic invoice parser ----------
-  function parseInvoice(text) {
-    const find = (re, flags = "i") => {
-      const m = text.match(new RegExp(re, flags));
-      return m ? m.groups?.v ?? m[1] ?? "" : "";
-    };
-    const dateRe =
-      "(?<v>(?:\\d{1,2}[\\/-]\\d{1,2}[\\/-]\\d{2,4})|(?:\\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\\s+\\d{1,2},\\s*\\d{4}\\b))";
-
-    const vendor = deriveVendor(text);
-    const invoice_number = find(
-      "(?:invoice\\s*(?:no\\.|#|number)?\\s*[:\\-]?\\s*)(?<v>[A-Z0-9\\-\\/\\.]{3,})"
+  // ---------- Parsing helpers tailored for your demo ----------
+  function looksLikeAddress(line) {
+    return (
+      /\d{1,6}\s+\w+/.test(line) || // street number + word
+      /\b(st|ave|rd|blvd|dr|ln|ct|ter|pkwy|wy|hwy|pl|cir|way|suite|ste|unit|apt|bldg|floor|fl|po box|p\.?o\.?\s?box)\b/i.test(
+        line
+      ) ||
+      /\b[A-Z]{2}\s*\d{5}(?:-\d{4})?\b/.test(line) || // state + ZIP
+      /\b(phone|tel|fax|email|www\.|website|vat|tax\s*id|ein)\b/i.test(line)
     );
-    const invoice_date = find(
-      "(?:invoice\\s*date\\s*[:\\-]?\\s*|date\\s*[:\\-]?\\s*)" + dateRe
-    );
-    const due_date = find("(?:due\\s*date\\s*[:\\-]?\\s*)" + dateRe);
-    const amount_due = bestAmount(text);
-    const items = deriveLineItems(text);
+  }
 
-    return {
-      vendor,
-      invoice_number,
-      invoice_date,
-      due_date,
-      amount_due,
-      items,
-    };
+  function trimAfterAddressOrContact(s) {
+    // cut at first digit (typical start of address) or contact keyword
+    let out = s.replace(
+      /(\s+(?:\d{1,6}\s+\w+|phone|tel|fax|email|www\.|website|vat|tax\s*id|ein).*)$/i,
+      ""
+    );
+    // also cut trailing ", WY 82001" style tails if present
+    out = out.replace(/,\s*[A-Z]{2}\s*\d{5}(?:-\d{4})?$/i, "");
+    return out.trim();
+  }
+
+  // Vendor: look before the word "Invoice", take strongest "name-only" line.
+  function deriveVendor(text) {
+    const i = text.search(/invoice\b/i);
+    const before =
+      i > 0 ? text.slice(Math.max(0, i - 600), i) : text.slice(0, 300);
+
+    // Split by real lines first, also split long lines by 2+ spaces
+    const lines = before
+      .split(/\r?\n/)
+      .flatMap((ln) => ln.split(/ {2,}/))
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    // Prefer a line without digits and not address-like.
+    let candidate =
+      lines.find((l) => !/\d/.test(l) && !looksLikeAddress(l)) ||
+      (lines[0] ? trimAfterAddressOrContact(lines[0]) : "") ||
+      "";
+
+    // If candidate still contains address tokens, strip after first such token
+    candidate = trimAfterAddressOrContact(candidate);
+
+    // If empty, use the longest non-address chunk
+    if (!candidate) {
+      const nonAddr = lines
+        .filter((l) => !looksLikeAddress(l))
+        .sort((a, b) => b.length - a.length)[0];
+      candidate = (nonAddr && trimAfterAddressOrContact(nonAddr)) || "";
+    }
+
+    return candidate;
+  }
+
+  // Invoice #: find “invoice/ invoice # / invoice no.” and capture next token WITH A DIGIT.
+  function deriveInvoiceNumber(text) {
+    const lower = text.toLowerCase();
+    const idx = lower.indexOf("invoice");
+    if (idx === -1) return "";
+
+    const after = text.slice(idx, idx + 300); // small window
+
+    // Nice formats: "Invoice # 123", "Invoice No. INV-1003", "Invoice: 1003"
+    let m =
+      after.match(
+        /invoice\s*(?:no\.|number|#|:)?\s*([A-Z0-9][A-Z0-9\-\/\.]+)/i
+      ) || null;
+    if (m && m[1] && /\d/.test(m[1]) && !/^invoice$/i.test(m[1])) return m[1];
+
+    // If breaks on next line, scan next 2 lines for first token with a digit
+    const lines = after
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (lines.length > 1) {
+      for (let ln = 1; ln < Math.min(lines.length, 3); ln++) {
+        const token = (lines[ln].match(/[A-Z0-9#][A-Z0-9\-\/\.]*/i) || [])[0];
+        if (token && /\d/.test(token) && !/^invoice$/i.test(token)) {
+          return token.replace(/^#/, "");
+        }
+      }
+    }
+
+    // Fallbacks near “invoice”
+    m = after.match(/#[ \t]*([A-Z0-9][A-Z0-9\-\/\.]+)/);
+    if (m && /\d/.test(m[1])) return m[1];
+
+    m = after.match(/\bINV[\- ]?([A-Z0-9][A-Z0-9\-\/\.]+)\b/i);
+    if (m && /\d/.test(m[1])) return m[1];
+
+    // Last resort: first 15 tokens after “invoice” that contain a digit
+    const afterTokens = after.split(/[\s,]+/).slice(0, 15);
+    const tok = afterTokens.find(
+      (t) => /\d/.test(t) && /^[A-Z0-9#][A-Z0-9\-\/\.]*$/i.test(t)
+    );
+    if (tok) return tok.replace(/^#/, "");
+    return "";
+  }
+
+  // Dates: look for label then capture a nearby date on same or next line
+  function deriveLabeledDate(text, labels) {
+    const labelRe = new RegExp(`(${labels.join("|")})\\b`, "i");
+    const dateToken =
+      /(\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\s+\d{1,2},\s*\d{4}\b|\b\d{4}-\d{2}-\d{2}\b)/i;
+
+    const m = text.match(labelRe);
+    if (!m) return "";
+
+    const start = Math.max(0, m.index);
+    const window = text.slice(start, start + 220); // small window after label
+
+    // same line
+    let d = window.match(dateToken);
+    if (d && d[1]) return d[1];
+
+    // next 2 lines
+    const lines = window
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    for (let i = 1; i < Math.min(lines.length, 3); i++) {
+      const dd = lines[i].match(dateToken);
+      if (dd && dd[1]) return dd[1];
+    }
+    return "";
+  }
+
+  function deriveInvoiceDate(text) {
+    return (
+      deriveLabeledDate(text, [
+        "invoice\\s*date",
+        "date\\s*of\\s*invoice",
+        "issued\\s*date",
+        "\\bdate\\b",
+      ]) || ""
+    );
+  }
+
+  function deriveDueDate(text) {
+    return (
+      deriveLabeledDate(text, [
+        "due\\s*date",
+        "payment\\s*due",
+        "due\\s*on",
+        "pay\\s*by",
+      ]) || ""
+    );
   }
 
   function bestAmount(text) {
@@ -188,23 +309,6 @@
     );
     const toNum = (s) => Number(String(s).replace(/[^0-9.]/g, "")) || 0;
     return all.sort((a, b) => toNum(b) - toNum(a))[0] || "";
-  }
-
-  function deriveVendor(text) {
-    const idx = text.search(/invoice\s*(no\.|#|number|date)?/i);
-    if (idx > 0) {
-      const before = text.slice(Math.max(0, idx - 140), idx);
-      const words = before
-        .replace(/[^A-Za-z0-9&.,\- ]/g, " ")
-        .split(/\s+/)
-        .filter(Boolean);
-      return words
-        .slice(-6)
-        .join(" ")
-        .replace(/\s{2,}/g, " ")
-        .trim();
-    }
-    return "";
   }
 
   function deriveLineItems(text) {
@@ -232,7 +336,27 @@
     return items;
   }
 
-  // ---------- Fill your existing form ----------
+  // ---------- Parse + Fill ----------
+  function parseInvoice(text) {
+    const vendor = deriveVendor(text);
+    const invoice_number = deriveInvoiceNumber(text);
+    const invoice_date_raw = deriveInvoiceDate(text);
+    const due_date_raw = deriveDueDate(text);
+    const invoice_date = toInputDate(invoice_date_raw);
+    const due_date = toInputDate(due_date_raw);
+    const amount_due = bestAmount(text);
+    const items = deriveLineItems(text);
+
+    return {
+      vendor,
+      invoice_number,
+      invoice_date,
+      due_date,
+      amount_due,
+      items,
+    };
+  }
+
   function fillForm(parsed, filename) {
     const vendor = $("#vendor");
     const invno = $("#invno");
@@ -242,8 +366,8 @@
 
     if (vendor) vendor.value = parsed.vendor || "";
     if (invno) invno.value = parsed.invoice_number || "";
-    if (invdate) invdate.value = toInputDate(parsed.invoice_date) || "";
-    if (duedate) duedate.value = toInputDate(parsed.due_date) || "";
+    if (invdate) invdate.value = parsed.invoice_date || "";
+    if (duedate) duedate.value = parsed.due_date || "";
     if (amount) amount.value = moneyNum(parsed.amount_due).toFixed(2) || "";
 
     const body = $("#lines-body");
@@ -293,9 +417,6 @@
 
     try {
       const text = await extractPdfText(file);
-      if (!text || text.length < 5)
-        throw new Error("No text detected after OCR");
-      chosen && (chosen.textContent = "Parsing…");
       const parsed = parseInvoice(text);
       log("Parsed:", parsed);
       fillForm(parsed, file.name);
@@ -310,13 +431,10 @@
     } catch (e) {
       err("Parse error:", e);
       chosen && (chosen.textContent = `Could not parse ${file.name}.`);
-      alert(
-        "We couldn't parse that PDF. If this keeps happening, test with a text-based PDF (not a scan)."
-      );
+      alert("We couldn't parse that PDF.");
     }
   }
 
-  // ---------- Wire up your HTML ----------
   window.addEventListener("DOMContentLoaded", () => {
     const fi = $("#invoice-file");
     const btn = $("#choose-file");
