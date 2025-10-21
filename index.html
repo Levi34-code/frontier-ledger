@@ -336,9 +336,9 @@
             <div class="form-card">
               <h3>PDF Preview</h3>
               <div class="pdf-preview">
-                <div class="pdf-placeholder">
+                <div class="pdf-placeholder" id="detail-pdf-container">
                   <p id="detail-file">No file uploaded</p>
-                  <button class="btn-secondary" disabled>Download PDF</button>
+                  <canvas id="detail-pdf-canvas" style="max-width: 100%; display: none;"></canvas>
                 </div>
               </div>
             </div>
@@ -561,9 +561,16 @@
 
           <div class="split-sidebar">
             <div class="sidebar-card">
+              <h4>PDF Preview</h4>
+              <div class="pdf-preview-sidebar" id="new-invoice-pdf-container">
+                <p id="new-invoice-pdf-status" style="color: var(--sagebrush); text-align: center;">Upload a PDF to preview</p>
+                <canvas id="new-invoice-pdf-canvas" style="max-width: 100%; display: none;"></canvas>
+              </div>
+            </div>
+            <div class="sidebar-card">
               <h4>Tips</h4>
               <p class="mb-1">
-                • Upload PDF/JPG/PNG; we’ll keep filename for now.
+                • Upload PDF/JPG/PNG; we'll keep filename for now.
               </p>
               <p class="mb-1">
                 • Line totals update when you change Qty/Price.

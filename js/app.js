@@ -22,8 +22,9 @@
     window.scrollTo(0, 0);
   };
 
-  let invoices = []; // {id, no, vendor, date, due, amount, status, fileName, lines:[]}
+  let invoices = []; // {id, no, vendor, date, due, amount, status, fileName, lines:[], pdfData:ArrayBuffer}
   let currentInvoiceId = null;
+  let currentPdfFile = null; // Store current PDF file for preview
 
   function fmtDate(d) {
     if (!d) return "—";
@@ -197,7 +198,7 @@
     });
   }
 
-  window.saveNewInvoice = function saveNewInvoice(e) {
+  window.saveNewInvoice = async function saveNewInvoice(e) {
     e.preventDefault();
     const vendor = document.getElementById("vendor").value.trim();
     const no = document.getElementById("invno").value.trim();
@@ -213,6 +214,12 @@
       return;
     }
 
+    // Store PDF data if available
+    let pdfData = null;
+    if (file && file.type === "application/pdf") {
+      pdfData = await file.arrayBuffer();
+    }
+
     const id = crypto.randomUUID();
     invoices.unshift({
       id,
@@ -226,6 +233,7 @@
       assignee: "",
       fileName,
       lines,
+      pdfData,
       createdAt: new Date().toISOString(),
     });
 
@@ -234,9 +242,38 @@
   };
 
   // ------------------------------------------------------------
+  // PDF Rendering
+  // ------------------------------------------------------------
+  async function renderPdfToCanvas(pdfData, canvasId) {
+    if (!PDFJS || !pdfData) return;
+    
+    try {
+      const pdf = await PDFJS.getDocument({ data: pdfData }).promise;
+      const page = await pdf.getPage(1); // Render first page
+      
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      
+      const viewport = page.getViewport({ scale: 1.5 });
+      const context = canvas.getContext("2d");
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+      
+      await page.render({
+        canvasContext: context,
+        viewport: viewport
+      }).promise;
+      
+      canvas.style.display = "block";
+    } catch (e) {
+      console.error("PDF render error:", e);
+    }
+  }
+
+  // ------------------------------------------------------------
   // Invoice Detail
   // ------------------------------------------------------------
-  window.openInvoice = function openInvoice(id) {
+  window.openInvoice = async function openInvoice(id) {
     const inv = invoices.find((i) => i.id === id);
     if (!inv) return;
     currentInvoiceId = id;
@@ -260,9 +297,24 @@
       "Created: " +
       (inv.createdAt ? new Date(inv.createdAt).toLocaleString() : "—");
 
-    document.getElementById("detail-file").textContent = inv.fileName
-      ? "File: " + inv.fileName
-      : "No file uploaded";
+    const fileLabel = document.getElementById("detail-file");
+    const pdfCanvas = document.getElementById("detail-pdf-canvas");
+    
+    if (inv.fileName) {
+      fileLabel.textContent = "File: " + inv.fileName;
+    } else {
+      fileLabel.textContent = "No file uploaded";
+    }
+    
+    // Render PDF if available
+    if (inv.pdfData) {
+      await ensurePdfJs();
+      await renderPdfToCanvas(inv.pdfData, "detail-pdf-canvas");
+      fileLabel.style.display = "none";
+    } else {
+      if (pdfCanvas) pdfCanvas.style.display = "none";
+      fileLabel.style.display = "block";
+    }
 
     const body = document.getElementById("detail-lines");
     body.innerHTML = "";
@@ -723,6 +775,7 @@
     if (typeof window.showScreen === "function")
       window.showScreen("invoice-new");
 
+    currentPdfFile = file; // Store for later use
     const chosen = $("#file-chosen");
     chosen && (chosen.textContent = `Reading ${file.name} …`);
     log("Selected:", file.name, file.type);
@@ -739,6 +792,12 @@
       const parsed = parseInvoice(text);
       log("Parsed:", parsed);
       fillForm(parsed, file.name);
+      
+      // Render PDF preview in sidebar
+      const pdfData = await file.arrayBuffer();
+      await renderPdfToCanvas(pdfData, "new-invoice-pdf-canvas");
+      const status = $("#new-invoice-pdf-status");
+      if (status) status.style.display = "none";
     } catch (e) {
       err("Parse error:", e);
       chosen && (chosen.textContent = `Could not parse ${file.name}.`);
