@@ -1,20 +1,348 @@
-// js/app.js — demo-stable parsing: vendor name only + robust invoice # + dates
+// js/app.js — unified app logic + upload/parse (single wiring)
 (() => {
   "use strict";
 
-  const AUTO_SAVE_AFTER_PARSE = false;
+  // ------------------------------------------------------------
+  // Nav & State
+  // ------------------------------------------------------------
+  window.showScreen = function showScreen(screenId) {
+    document
+      .querySelectorAll(".screen")
+      .forEach((s) => s.classList.remove("active"));
+    document.getElementById(screenId).classList.add("active");
 
-  // pdf.js (force CDN ESM)
+    document
+      .querySelectorAll(".nav-link")
+      .forEach((a) => a.classList.remove("active"));
+    const activeLink = document.querySelector(
+      '.nav-link[href="#' + screenId + '"]'
+    );
+    if (activeLink) activeLink.classList.add("active");
+
+    window.scrollTo(0, 0);
+  };
+
+  let invoices = []; // {id, no, vendor, date, due, amount, status, fileName, lines:[]}
+  let currentInvoiceId = null;
+
+  function fmtDate(d) {
+    if (!d) return "—";
+    try {
+      return new Date(d).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    } catch {
+      return d;
+    }
+  }
+
+  function statusBadge(status) {
+    const map = {
+      New: "badge-warning",
+      "Waiting Approval": "badge-info",
+      Approved: "badge-success",
+      "Ready to Pay": "badge-primary",
+      Paid: "badge-primary",
+      Exception: "badge-danger",
+      Rejected: "badge-danger",
+    };
+    return map[status] || "badge-secondary";
+  }
+
+  function renderInvoiceTable(list = invoices) {
+    const tbody = document.getElementById("invoices-body");
+    const chips = document.querySelectorAll(".filter-chip");
+    const counts = {
+      All: invoices.length,
+      New: invoices.filter((i) => i.status === "New").length,
+      "Needs Coding": invoices.filter((i) => i.status === "Needs Coding")
+        .length,
+      "Waiting Approval": invoices.filter(
+        (i) => i.status === "Waiting Approval"
+      ).length,
+      Exception: invoices.filter((i) => i.status === "Exception").length,
+      "Ready to Pay": invoices.filter((i) => i.status === "Ready to Pay")
+        .length,
+      Paid: invoices.filter((i) => i.status === "Paid").length,
+    };
+    chips.forEach((ch) => {
+      const label = ch.textContent.split(" (")[0];
+      if (counts[label] !== undefined)
+        ch.textContent = label + " (" + counts[label] + ")";
+    });
+
+    tbody.innerHTML = "";
+    if (!list.length) {
+      tbody.innerHTML =
+        '<tr><td colspan="9" class="text-center" style="color:var(--sagebrush);">No invoices yet</td></tr>';
+      return;
+    }
+    list.forEach((inv) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        '<td><input type="checkbox" /></td>' +
+        '<td class="mono">' +
+        inv.no +
+        "</td>" +
+        "<td>" +
+        inv.vendor +
+        "</td>" +
+        "<td>" +
+        fmtDate(inv.date) +
+        "</td>" +
+        "<td>" +
+        fmtDate(inv.due) +
+        "</td>" +
+        '<td class="mono">$' +
+        Number(inv.amount || 0).toFixed(2) +
+        "</td>" +
+        '<td><span class="badge ' +
+        statusBadge(inv.status) +
+        '">' +
+        inv.status +
+        "</span></td>" +
+        "<td>" +
+        (inv.assignee || "—") +
+        "</td>" +
+        '<td><button class="btn-link" onclick="openInvoice(\'' +
+        inv.id +
+        "')\">View</button></td>";
+      tbody.appendChild(tr);
+    });
+  }
+
+  window.filterStatus = function filterStatus(status) {
+    if (status === "All") return renderInvoiceTable(invoices);
+    renderInvoiceTable(invoices.filter((i) => i.status === status));
+  };
+
+  window.searchInvoices = function searchInvoices(q) {
+    q = (q || "").toLowerCase();
+    const filtered = invoices.filter(
+      (i) =>
+        (i.no || "").toLowerCase().includes(q) ||
+        (i.vendor || "").toLowerCase().includes(q)
+    );
+    renderInvoiceTable(filtered);
+  };
+
+  // ------------------------------------------------------------
+  // Line Items table on New Invoice
+  // ------------------------------------------------------------
+  function wireLineItems() {
+    const linesBody = document.getElementById("lines-body");
+    const addLineBtn = document.getElementById("add-line");
+
+    function recalcLine(tr) {
+      const qty = parseFloat(
+        tr.querySelector("td:nth-child(4) input")?.value || "0"
+      );
+      const price = parseFloat(
+        tr.querySelector("td:nth-child(5) input")?.value || "0"
+      );
+      const totalCell = tr.querySelector("td:nth-child(6)");
+      if (totalCell) totalCell.textContent = "$" + (qty * price).toFixed(2);
+    }
+
+    if (linesBody) {
+      linesBody.addEventListener("input", (e) => {
+        const tr = e.target.closest("tr");
+        if (tr) recalcLine(tr);
+      });
+      linesBody.addEventListener("click", (e) => {
+        if (e.target.classList.contains("remove-line")) {
+          const tr = e.target.closest("tr");
+          if (linesBody.rows.length > 1) tr.remove();
+        }
+      });
+    }
+
+    if (addLineBtn && linesBody) {
+      addLineBtn.addEventListener("click", () => {
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          '<td><input type="text" class="form-input-sm" placeholder="Description" /></td>' +
+          '<td><input type="text" class="form-input-sm" placeholder="GL Account" /></td>' +
+          '<td><input type="text" class="form-input-sm" placeholder="Cost Center" /></td>' +
+          '<td><input type="number" step="1" min="1" value="1" class="form-input-sm" /></td>' +
+          '<td><input type="number" step="0.01" min="0" value="0.00" class="form-input-sm" /></td>' +
+          '<td class="mono">$0.00</td>' +
+          '<td><button type="button" class="btn-link-danger remove-line">Remove</button></td>';
+        linesBody.appendChild(tr);
+      });
+    }
+  }
+
+  function collectLines() {
+    const rows = Array.from(document.querySelectorAll("#lines-body tr"));
+    return rows.map((tr) => {
+      const tds = tr.querySelectorAll("td");
+      const [desc, gl, cc, qty, price] = [
+        tds[0].querySelector("input")?.value || "",
+        tds[1].querySelector("input")?.value || "",
+        tds[2].querySelector("input")?.value || "",
+        parseFloat(tds[3].querySelector("input")?.value || "0"),
+        parseFloat(tds[4].querySelector("input")?.value || "0"),
+      ];
+      return {
+        description: desc,
+        gl,
+        cc,
+        quantity: qty,
+        unitPrice: price,
+        total: qty * price,
+      };
+    });
+  }
+
+  window.saveNewInvoice = function saveNewInvoice(e) {
+    e.preventDefault();
+    const vendor = document.getElementById("vendor").value.trim();
+    const no = document.getElementById("invno").value.trim();
+    const invdate = document.getElementById("invdate").value;
+    const duedate = document.getElementById("duedate").value;
+    const amount = document.getElementById("amount").value;
+    const file = document.getElementById("invoice-file").files[0];
+    const fileName = file ? file.name : "";
+    const lines = collectLines();
+
+    if (!vendor || !no || !invdate || !amount) {
+      alert("Please complete Vendor, Invoice Number, Date, and Amount.");
+      return;
+    }
+
+    const id = crypto.randomUUID();
+    invoices.unshift({
+      id,
+      no,
+      vendor,
+      date: invdate,
+      due: duedate || null,
+      amount: Number(amount),
+      terms: document.getElementById("terms").value,
+      status: "New",
+      assignee: "",
+      fileName,
+      lines,
+      createdAt: new Date().toISOString(),
+    });
+
+    renderInvoiceTable();
+    openInvoice(id);
+  };
+
+  // ------------------------------------------------------------
+  // Invoice Detail
+  // ------------------------------------------------------------
+  window.openInvoice = function openInvoice(id) {
+    const inv = invoices.find((i) => i.id === id);
+    if (!inv) return;
+    currentInvoiceId = id;
+
+    document.getElementById("detail-title").textContent =
+      "Invoice Detail: " + inv.no;
+    document.getElementById("detail-vendor").value = inv.vendor || "";
+    document.getElementById("detail-number").value = inv.no || "";
+    document.getElementById("detail-date").value = inv.date || "";
+    document.getElementById("detail-due").value = inv.due || "";
+    document.getElementById("detail-terms").value = inv.terms || "Net 30";
+    document.getElementById("detail-amount").value =
+      inv.amount != null ? "$" + inv.amount.toFixed(2) : "";
+
+    const st = document.getElementById("detail-status");
+    st.className = "badge " + statusBadge(inv.status) + " badge-lg";
+    st.textContent = inv.status || "New";
+    document.getElementById("detail-assignee").textContent =
+      inv.assignee || "—";
+    document.getElementById("detail-created").textContent =
+      "Created: " +
+      (inv.createdAt ? new Date(inv.createdAt).toLocaleString() : "—");
+
+    document.getElementById("detail-file").textContent = inv.fileName
+      ? "File: " + inv.fileName
+      : "No file uploaded";
+
+    const body = document.getElementById("detail-lines");
+    body.innerHTML = "";
+    if (!inv.lines || !inv.lines.length) {
+      body.innerHTML =
+        '<tr><td colspan="7" class="text-center" style="color:var(--sagebrush);">No lines yet</td></tr>';
+    } else {
+      inv.lines.forEach((li, idx) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          "<td>" +
+          (li.description || "") +
+          "</td>" +
+          "<td>" +
+          (li.gl || "") +
+          "</td>" +
+          "<td>" +
+          (li.cc || "") +
+          "</td>" +
+          '<td class="mono">' +
+          (li.quantity ?? "") +
+          "</td>" +
+          '<td class="mono">' +
+          (li.unitPrice != null ? "$" + Number(li.unitPrice).toFixed(2) : "") +
+          "</td>" +
+          '<td class="mono">' +
+          (li.total != null ? "$" + Number(li.total).toFixed(2) : "") +
+          "</td>" +
+          '<td><button class="btn-link-danger" onclick="removeDetailLine(\'' +
+          id +
+          "', " +
+          idx +
+          ')">Remove</button></td>';
+        body.appendChild(tr);
+      });
+    }
+
+    showScreen("invoice-detail");
+  };
+
+  window.addDetailLine = function addDetailLine() {
+    if (!currentInvoiceId) return;
+    const inv = invoices.find((i) => i.id === currentInvoiceId);
+    inv.lines = inv.lines || [];
+    inv.lines.push({
+      description: "",
+      gl: "",
+      cc: "",
+      quantity: 1,
+      unitPrice: 0,
+      total: 0,
+    });
+    openInvoice(currentInvoiceId);
+  };
+
+  window.removeDetailLine = function removeDetailLine(id, idx) {
+    const inv = invoices.find((i) => i.id === id);
+    if (!inv) return;
+    inv.lines.splice(idx, 1);
+    openInvoice(id);
+  };
+
+  window.setStatusCurrent = function setStatusCurrent(newStatus) {
+    if (!currentInvoiceId) return;
+    const inv = invoices.find((i) => i.id === currentInvoiceId);
+    inv.status = newStatus;
+    renderInvoiceTable();
+    openInvoice(currentInvoiceId);
+  };
+
+  // ------------------------------------------------------------
+  // Upload + Parse (single wiring — prevents double-open)
+  // ------------------------------------------------------------
   const CDN_PDFJS_URL =
     "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.7.76/legacy/build/pdf.min.mjs";
   const CDN_WORKER_URL =
     "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.7.76/legacy/build/pdf.worker.min.mjs";
-
-  // OCR fallback
   const TESSERACT_URL =
     "https://unpkg.com/tesseract.js@5.1.1/dist/tesseract.min.js";
 
-  // ---------- utils ----------
   const $ = (s) => document.querySelector(s);
   const log = (...a) => console.log("[FL AP]", ...a);
   const warn = (...a) => console.warn("[FL AP]", ...a);
@@ -24,7 +352,7 @@
     String(s || "")
       .replace(/\u00A0/g, " ")
       .replace(/[ \t]+/g, " ")
-      .replace(/inv\s*oice/gi, "invoice") // fix OCR splits like "Inv oice"
+      .replace(/inv\s*oice/gi, "invoice")
       .trim();
 
   const moneyNum = (s) => Number(String(s || "").replace(/[^0-9.]/g, "")) || 0;
@@ -45,8 +373,6 @@
   function toInputDate(s) {
     if (!s) return "";
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-
-    // Accept: mm/dd/yyyy, m/d/yy, yyyy-mm-dd, "Jan 2, 2025"
     try {
       const m1 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
       if (m1) {
@@ -67,7 +393,6 @@
     return `${y}-${m}-${day}`;
   }
 
-  // ---------- pdf.js loader (force CDN) ----------
   let PDFJS = null;
   async function importEsm(url) {
     const abs = new URL(url, location.href).href;
@@ -102,7 +427,6 @@
     return true;
   }
 
-  // ---------- PDF → text with OCR fallback ----------
   async function extractPdfText(file) {
     const ok = await ensurePdfJs();
     if (!ok) throw new Error("pdf.js unavailable");
@@ -110,7 +434,6 @@
     const buf = await file.arrayBuffer();
     const pdf = await PDFJS.getDocument({ data: buf }).promise;
 
-    // Embedded text first
     let text = "";
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
@@ -119,7 +442,6 @@
     }
     text = normalize(text);
 
-    // OCR fallback if no text
     if (text.length < 30) {
       await ensureTesseract();
       const status = $("#file-chosen");
@@ -142,78 +464,60 @@
     return text;
   }
 
-  // ---------- Parsing helpers tailored for your demo ----------
   function looksLikeAddress(line) {
     return (
-      /\d{1,6}\s+\w+/.test(line) || // street number + word
+      /\d{1,6}\s+\w+/.test(line) ||
       /\b(st|ave|rd|blvd|dr|ln|ct|ter|pkwy|wy|hwy|pl|cir|way|suite|ste|unit|apt|bldg|floor|fl|po box|p\.?o\.?\s?box)\b/i.test(
         line
       ) ||
-      /\b[A-Z]{2}\s*\d{5}(?:-\d{4})?\b/.test(line) || // state + ZIP
+      /\b[A-Z]{2}\s*\d{5}(?:-\d{4})?\b/.test(line) ||
       /\b(phone|tel|fax|email|www\.|website|vat|tax\s*id|ein)\b/i.test(line)
     );
   }
-
   function trimAfterAddressOrContact(s) {
-    // cut at first digit (typical start of address) or contact keyword
     let out = s.replace(
       /(\s+(?:\d{1,6}\s+\w+|phone|tel|fax|email|www\.|website|vat|tax\s*id|ein).*)$/i,
       ""
     );
-    // also cut trailing ", WY 82001" style tails if present
     out = out.replace(/,\s*[A-Z]{2}\s*\d{5}(?:-\d{4})?$/i, "");
     return out.trim();
   }
-
-  // Vendor: look before the word "Invoice", take strongest "name-only" line.
   function deriveVendor(text) {
     const i = text.search(/invoice\b/i);
     const before =
       i > 0 ? text.slice(Math.max(0, i - 600), i) : text.slice(0, 300);
-
-    // Split by real lines first, also split long lines by 2+ spaces
     const lines = before
       .split(/\r?\n/)
       .flatMap((ln) => ln.split(/ {2,}/))
       .map((l) => l.trim())
       .filter(Boolean);
 
-    // Prefer a line without digits and not address-like.
     let candidate =
       lines.find((l) => !/\d/.test(l) && !looksLikeAddress(l)) ||
       (lines[0] ? trimAfterAddressOrContact(lines[0]) : "") ||
       "";
-
-    // If candidate still contains address tokens, strip after first such token
     candidate = trimAfterAddressOrContact(candidate);
 
-    // If empty, use the longest non-address chunk
     if (!candidate) {
       const nonAddr = lines
         .filter((l) => !looksLikeAddress(l))
         .sort((a, b) => b.length - a.length)[0];
       candidate = (nonAddr && trimAfterAddressOrContact(nonAddr)) || "";
     }
-
     return candidate;
   }
-
-  // Invoice #: find “invoice/ invoice # / invoice no.” and capture next token WITH A DIGIT.
   function deriveInvoiceNumber(text) {
     const lower = text.toLowerCase();
     const idx = lower.indexOf("invoice");
     if (idx === -1) return "";
+    const after = text.slice(idx, idx + 300);
 
-    const after = text.slice(idx, idx + 300); // small window
-
-    // Nice formats: "Invoice # 123", "Invoice No. INV-1003", "Invoice: 1003"
     let m =
       after.match(
         /invoice\s*(?:no\.|number|#|:)?\s*([A-Z0-9][A-Z0-9\-\/\.]+)/i
       ) || null;
     if (m && m[1] && /\d/.test(m[1]) && !/^invoice$/i.test(m[1])) return m[1];
 
-    // If breaks on next line, scan next 2 lines for first token with a digit
     const lines = after
       .split(/\r?\n/)
       .map((l) => l.trim())
@@ -227,14 +531,12 @@
       }
     }
 
-    // Fallbacks near “invoice”
     m = after.match(/#[ \t]*([A-Z0-9][A-Z0-9\-\/\.]+)/);
     if (m && /\d/.test(m[1])) return m[1];
 
     m = after.match(/\bINV[\- ]?([A-Z0-9][A-Z0-9\-\/\.]+)\b/i);
     if (m && /\d/.test(m[1])) return m[1];
 
-    // Last resort: first 15 tokens after “invoice” that contain a digit
     const afterTokens = after.split(/[\s,]+/).slice(0, 15);
     const tok = afterTokens.find(
       (t) => /\d/.test(t) && /^[A-Z0-9#][A-Z0-9\-\/\.]*$/i.test(t)
@@ -242,8 +544,6 @@
     if (tok) return tok.replace(/^#/, "");
     return "";
   }
-
-  // Dates: look for label then capture a nearby date on same or next line
   function deriveLabeledDate(text, labels) {
     const labelRe = new RegExp(`(${labels.join("|")})\\b`, "i");
     const dateToken =
@@ -253,13 +553,11 @@
     if (!m) return "";
 
     const start = Math.max(0, m.index);
-    const window = text.slice(start, start + 220); // small window after label
+    const window = text.slice(start, start + 220);
 
-    // same line
     let d = window.match(dateToken);
     if (d && d[1]) return d[1];
 
-    // next 2 lines
     const lines = window
       .split(/\r?\n/)
       .map((l) => l.trim())
@@ -270,7 +568,6 @@
     }
     return "";
   }
-
   function deriveInvoiceDate(text) {
     return (
       deriveLabeledDate(text, [
@@ -281,7 +578,6 @@
       ]) || ""
     );
   }
-
   function deriveDueDate(text) {
     return (
       deriveLabeledDate(text, [
@@ -292,7 +588,6 @@
       ]) || ""
     );
   }
-
   function bestAmount(text) {
     const lbls = [
       /(amount\s*due)[:\s]*([$]?\s?\d[\d,]*\.\d{2})/i,
@@ -310,7 +605,6 @@
     const toNum = (s) => Number(String(s).replace(/[^0-9.]/g, "")) || 0;
     return all.sort((a, b) => toNum(b) - toNum(a))[0] || "";
   }
-
   function deriveLineItems(text) {
     const chunks = text.split(/\s{2,}|(?<=\d)\s(?=\d)/g);
     const items = [];
@@ -335,8 +629,6 @@
     }
     return items;
   }
-
-  // ---------- Parse + Fill ----------
   function parseInvoice(text) {
     const vendor = deriveVendor(text);
     const invoice_number = deriveInvoiceNumber(text);
@@ -395,10 +687,9 @@
     }
 
     const chosen = $("#file-chosen");
-    if (chosen && filename) chosen.textContent = `Parsed ✓ ${filename}`;
+    if (chosen && filename) chosen.textContent = `Uploaded ${filename}`;
   }
 
-  // ---------- Main flow ----------
   async function handleFile(file) {
     if (!file) return;
     if (typeof window.showScreen === "function")
@@ -420,14 +711,6 @@
       const parsed = parseInvoice(text);
       log("Parsed:", parsed);
       fillForm(parsed, file.name);
-
-      if (AUTO_SAVE_AFTER_PARSE) {
-        const form = $("#invoice-form");
-        if (form)
-          form.dispatchEvent(
-            new Event("submit", { cancelable: true, bubbles: true })
-          );
-      }
     } catch (e) {
       err("Parse error:", e);
       chosen && (chosen.textContent = `Could not parse ${file.name}.`);
@@ -435,17 +718,30 @@
     }
   }
 
-  window.addEventListener("DOMContentLoaded", () => {
-    const fi = $("#invoice-file");
-    const btn = $("#choose-file");
-    const uz = $("#upload-zone");
+  function wireUploadOnce() {
+    // Guard to ensure we don't double-wire (in case of hot reloads)
+    if (window.__FL_UPLOAD_WIRED__) return;
+    window.__FL_UPLOAD_WIRED__ = true;
 
-    if (btn && fi) btn.addEventListener("click", () => fi.click());
-    if (fi)
+    const fi = document.getElementById("invoice-file");
+    const btn = document.getElementById("choose-file");
+    const uz = document.getElementById("upload-zone");
+    const fc = document.getElementById("file-chosen");
+
+    if (btn && fi) {
+      btn.addEventListener("click", () => {
+        // ONLY ONE trigger for the file picker
+        fi.click();
+      });
+    }
+
+    if (fi) {
       fi.addEventListener("change", () => {
         const f = fi.files?.[0];
         if (f) handleFile(f);
+        else fc && (fc.textContent = "");
       });
+    }
 
     if (uz) {
       ["dragenter", "dragover"].forEach((evt) =>
@@ -465,7 +761,15 @@
         if (f) handleFile(f);
       });
     }
+  }
 
+  // ------------------------------------------------------------
+  // Boot
+  // ------------------------------------------------------------
+  window.addEventListener("DOMContentLoaded", () => {
+    renderInvoiceTable();
+    wireLineItems();
+    wireUploadOnce();
     log("Booted.");
   });
 })();
