@@ -1,0 +1,13 @@
+FAVICON SETUP
+=============
+
+To add your favicon (the mountain logo icon that appears in the browser tab):
+
+1. Take the mountain logo image file you uploaded in the chat
+2. Save it to this directory (assets/) as: favicon.png
+3. The file should be named exactly: favicon.png
+4. Recommended size: 32x32 pixels or 64x64 pixels (PNG format)
+
+The HTML is already configured to use: assets/favicon.png
+
+Once you save the file here, refresh your browser and the icon will appear in the tab!

@@ -26,6 +26,37 @@
   let currentInvoiceId = null;
   let currentPdfFile = null; // Store current PDF file for preview
 
+  // ------------------------------------------------------------
+  // Toast Notification System
+  // ------------------------------------------------------------
+  function showToast(message, type = "success") {
+    const container = document.getElementById("toast-container");
+    if (!container) return;
+
+    const toast = document.createElement("div");
+    toast.className = `toast toast-${type}`;
+
+    const icon = document.createElement("div");
+    icon.className = "toast-icon";
+    icon.textContent = type === "success" ? "✓" : "×";
+
+    const msg = document.createElement("div");
+    msg.className = "toast-message";
+    msg.textContent = message;
+
+    toast.appendChild(icon);
+    toast.appendChild(msg);
+    container.appendChild(toast);
+
+    // Auto-dismiss after 3 seconds
+    setTimeout(() => {
+      toast.classList.add("toast-out");
+      setTimeout(() => {
+        toast.remove();
+      }, 300);
+    }, 3000);
+  }
+
   function fmtDate(d) {
     if (!d) return "—";
     try {
@@ -46,7 +77,7 @@
       Approved: "badge-success",
       "Ready to Pay": "badge-primary",
       Paid: "badge-primary",
-      Exception: "badge-danger",
+      Issue: "badge-danger",
       Rejected: "badge-danger",
     };
     return map[status] || "badge-secondary";
@@ -63,7 +94,7 @@
       "Waiting Approval": invoices.filter(
         (i) => i.status === "Waiting Approval"
       ).length,
-      Exception: invoices.filter((i) => i.status === "Exception").length,
+      Issue: invoices.filter((i) => i.status === "Issue").length,
       "Ready to Pay": invoices.filter((i) => i.status === "Ready to Pay")
         .length,
       Paid: invoices.filter((i) => i.status === "Paid").length,
@@ -138,12 +169,12 @@
 
     function recalcLine(tr) {
       const qty = parseFloat(
-        tr.querySelector("td:nth-child(4) input")?.value || "0"
-      );
-      const price = parseFloat(
         tr.querySelector("td:nth-child(5) input")?.value || "0"
       );
-      const totalCell = tr.querySelector("td:nth-child(6)");
+      const price = parseFloat(
+        tr.querySelector("td:nth-child(6) input")?.value || "0"
+      );
+      const totalCell = tr.querySelector("td:nth-child(7)");
       if (totalCell) totalCell.textContent = "$" + (qty * price).toFixed(2);
     }
 
@@ -167,6 +198,7 @@
           '<td><input type="text" class="form-input-sm" placeholder="Description" /></td>' +
           '<td><input type="text" class="form-input-sm" placeholder="GL Account" /></td>' +
           '<td><input type="text" class="form-input-sm" placeholder="Cost Center" /></td>' +
+          '<td><select class="form-input-sm"><option value="John Doe" selected>John Doe (You)</option><option value="Jane Smith">Jane Smith (CFO)</option><option value="Mike Johnson">Mike Johnson (Controller)</option></select></td>' +
           '<td><input type="number" step="1" min="1" value="1" class="form-input-sm" /></td>' +
           '<td><input type="number" step="0.01" min="0" value="0.00" class="form-input-sm" /></td>' +
           '<td class="mono">$0.00</td>' +
@@ -180,17 +212,19 @@
     const rows = Array.from(document.querySelectorAll("#lines-body tr"));
     return rows.map((tr) => {
       const tds = tr.querySelectorAll("td");
-      const [desc, gl, cc, qty, price] = [
+      const [desc, gl, cc, approver, qty, price] = [
         tds[0].querySelector("input")?.value || "",
         tds[1].querySelector("input")?.value || "",
         tds[2].querySelector("input")?.value || "",
-        parseFloat(tds[3].querySelector("input")?.value || "0"),
+        tds[3].querySelector("select")?.value || "John Doe",
         parseFloat(tds[4].querySelector("input")?.value || "0"),
+        parseFloat(tds[5].querySelector("input")?.value || "0"),
       ];
       return {
         description: desc,
         gl,
         cc,
+        approver,
         quantity: qty,
         unitPrice: price,
         total: qty * price,
@@ -237,7 +271,15 @@
       createdAt: new Date().toISOString(),
     });
 
+    // Auto-set status to Waiting Approval since approver is assigned
+    const savedInvoice = invoices.find((i) => i.id === id);
+    if (savedInvoice) {
+      savedInvoice.status = "Waiting Approval";
+    }
+
     renderInvoiceTable();
+    updateDashboard();
+    updateApprovals();
     openInvoice(id);
   };
 
@@ -334,6 +376,9 @@
           "<td>" +
           (li.cc || "") +
           "</td>" +
+          "<td>" +
+          (li.approver || "—") +
+          "</td>" +
           '<td class="mono">' +
           (li.quantity ?? "") +
           "</td>" +
@@ -363,6 +408,7 @@
       description: "",
       gl: "",
       cc: "",
+      approver: "John Doe",
       quantity: 1,
       unitPrice: 0,
       total: 0,
@@ -382,7 +428,192 @@
     const inv = invoices.find((i) => i.id === currentInvoiceId);
     inv.status = newStatus;
     renderInvoiceTable();
+    updateDashboard();
+    updateApprovals();
     openInvoice(currentInvoiceId);
+  };
+
+  // ------------------------------------------------------------
+  // Dashboard Updates
+  // ------------------------------------------------------------
+  function updateDashboard() {
+    // Update KPIs
+    const awaitingApproval = invoices.filter(
+      (i) => i.status === "Waiting Approval"
+    ).length;
+    const issues = invoices.filter((i) => i.status === "Issue").length;
+
+    // Due this week
+    const oneWeekFromNow = new Date();
+    oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
+    const dueThisWeek = invoices.filter((i) => {
+      if (!i.due) return false;
+      const dueDate = new Date(i.due);
+      return dueDate <= oneWeekFromNow && dueDate >= new Date();
+    }).length;
+
+    // Update KPI cards
+    const kpiCards = document.querySelectorAll(".kpi-card");
+    if (kpiCards[0]) {
+      kpiCards[0].querySelector(".kpi-value").textContent = awaitingApproval;
+      const change0 = kpiCards[0].querySelector(".kpi-change");
+      change0.textContent = awaitingApproval > 0 ? "Needs attention" : "All clear";
+      change0.style.color = awaitingApproval > 0 ? "#f59e0b" : "#10b981";
+      kpiCards[0].style.borderLeftColor = "#f59e0b";
+    }
+    if (kpiCards[1]) {
+      kpiCards[1].querySelector(".kpi-value").textContent = dueThisWeek;
+      const change1 = kpiCards[1].querySelector(".kpi-change");
+      change1.textContent =
+        dueThisWeek > 0 ? "Action required" : "No urgent items";
+      change1.style.color = dueThisWeek > 0 ? "#dc2626" : "#10b981";
+      kpiCards[1].style.borderLeftColor = dueThisWeek > 0 ? "#dc2626" : "#10b981";
+    }
+    if (kpiCards[2]) {
+      kpiCards[2].querySelector(".kpi-value").textContent = issues;
+      const change2 = kpiCards[2].querySelector(".kpi-change");
+      change2.textContent = issues > 0 ? "Needs review" : "No issues";
+      change2.style.color = issues > 0 ? "#dc2626" : "#10b981";
+      kpiCards[2].style.borderLeftColor = issues > 0 ? "#dc2626" : "#10b981";
+    }
+    if (kpiCards[3]) {
+      kpiCards[3].querySelector(".kpi-value").textContent = invoices.length
+        ? "2.5 days"
+        : "—";
+      kpiCards[3].querySelector(".kpi-change").textContent = invoices.length
+        ? "Avg processing time"
+        : "No data yet";
+      kpiCards[3].style.borderLeftColor = "#3b82f6";
+    }
+
+    // Update Recent Activity
+    const activityDiv = document.getElementById("recent-activity");
+    if (activityDiv) {
+      if (invoices.length === 0) {
+        activityDiv.innerHTML =
+          '<div class="text-center" style="padding: 16px; color: var(--sagebrush); font-weight: 600">No activity yet</div>';
+      } else {
+        const recent = invoices.slice(0, 5);
+        let html = "";
+        recent.forEach((inv) => {
+          const statusColor =
+            inv.status === "Waiting Approval"
+              ? "#f59e0b"
+              : inv.status === "Approved"
+              ? "#10b981"
+              : inv.status === "Rejected"
+              ? "#ef4444"
+              : "#6b7280";
+          html += `<div class="activity-item">`;
+          html += `<div class="activity-vendor">${inv.vendor}</div>`;
+          html += `<div class="activity-invoice">Invoice #${inv.no}</div>`;
+          html += `<div class="activity-meta">`;
+          html += `<span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${statusColor}; margin-right: 6px;"></span>`;
+          html += `${inv.status} • ${fmtDate(inv.createdAt)}`;
+          html += `</div>`;
+          html += `</div>`;
+        });
+        activityDiv.innerHTML = html;
+      }
+    }
+
+    // Update Aging Summary
+    const agingDiv = document.getElementById("aging-summary");
+    if (agingDiv) {
+      if (invoices.length === 0) {
+        agingDiv.innerHTML =
+          '<div class="text-center" style="padding: 24px; color: var(--sagebrush); font-weight: 600">No aging data yet</div>';
+      } else {
+        const total = invoices.reduce((sum, i) => sum + (i.amount || 0), 0);
+        const current = invoices.filter(
+          (i) =>
+            i.status === "New" ||
+            i.status === "Waiting Approval" ||
+            i.status === "Ready to Pay"
+        ).length;
+        const paid = invoices.filter((i) => i.status === "Paid").length;
+        agingDiv.innerHTML = `
+          <div class="aging-grid">
+            <div class="aging-item">
+              <div class="aging-value">$${total.toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}</div>
+              <div class="aging-label">Total Outstanding</div>
+            </div>
+            <div class="aging-item">
+              <div class="aging-value">${current}</div>
+              <div class="aging-label">In Process</div>
+            </div>
+            <div class="aging-item">
+              <div class="aging-value">${paid}</div>
+              <div class="aging-label">Paid</div>
+            </div>
+          </div>
+        `;
+      }
+    }
+  }
+
+  // ------------------------------------------------------------
+  // Approvals Updates
+  // ------------------------------------------------------------
+  function updateApprovals() {
+    const approvalsBody = document.getElementById("approvals-body");
+    if (!approvalsBody) return;
+
+    const pending = invoices.filter((i) => i.status === "Waiting Approval");
+
+    if (pending.length === 0) {
+      approvalsBody.innerHTML =
+        '<tr><td colspan="5" class="text-center" style="color: var(--sagebrush);">No approvals pending</td></tr>';
+      return;
+    }
+
+    approvalsBody.innerHTML = "";
+    pending.forEach((inv) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        '<td class="mono">' +
+        inv.no +
+        "</td>" +
+        "<td>" +
+        inv.vendor +
+        "</td>" +
+        '<td class="mono">$' +
+        Number(inv.amount || 0).toFixed(2) +
+        "</td>" +
+        "<td>" +
+        fmtDate(inv.date) +
+        "</td>" +
+        '<td><button class="btn-primary btn-sm" onclick="approveInvoice(\'' +
+        inv.id +
+        "')\">Approve</button> " +
+        '<button class="btn-danger btn-sm" onclick="rejectInvoiceFromApproval(\'' +
+        inv.id +
+        "')\">Reject</button></td>";
+      approvalsBody.appendChild(tr);
+    });
+  }
+
+  window.approveInvoice = function approveInvoice(id) {
+    const inv = invoices.find((i) => i.id === id);
+    if (!inv) return;
+    inv.status = "Approved";
+    renderInvoiceTable();
+    updateDashboard();
+    updateApprovals();
+    showToast(`Invoice ${inv.no} approved successfully!`, "success");
+  };
+
+  window.rejectInvoiceFromApproval = function rejectInvoiceFromApproval(id) {
+    const inv = invoices.find((i) => i.id === id);
+    if (!inv) return;
+    inv.status = "Rejected";
+    renderInvoiceTable();
+    updateDashboard();
+    updateApprovals();
+    showToast(`Invoice ${inv.no} has been rejected.`, "error");
   };
 
   // ------------------------------------------------------------
@@ -722,6 +953,7 @@
           description: "Replacement Filters - Model X200",
           gl: "5200 - Maintenance Supplies",
           cc: "OPS-01",
+          approver: "John Doe",
           quantity: 2,
           unitPrice: 125.00
         },
@@ -729,6 +961,7 @@
           description: "Hydraulic Hose - 3/8in",
           gl: "5200 - Maintenance Supplies",
           cc: "OPS-01",
+          approver: "John Doe",
           quantity: 4,
           unitPrice: 45.50
         },
@@ -736,6 +969,7 @@
           description: "On-site Service Call (2 hours)",
           gl: "5300 - Contracted Services",
           cc: "OPS-01",
+          approver: "John Doe",
           quantity: 1,
           unitPrice: 210.00
         }
@@ -754,6 +988,11 @@
            <td><input type="text" class="form-input-sm" value="${escapeHtml(
              it.cc
            )}" /></td>
+           <td><select class="form-input-sm">
+             <option value="John Doe" ${it.approver === "John Doe" ? "selected" : ""}>John Doe (You)</option>
+             <option value="Jane Smith" ${it.approver === "Jane Smith" ? "selected" : ""}>Jane Smith (CFO)</option>
+             <option value="Mike Johnson" ${it.approver === "Mike Johnson" ? "selected" : ""}>Mike Johnson (Controller)</option>
+           </select></td>
            <td><input type="number" step="1" min="1" value="${
              it.quantity
            }" class="form-input-sm" /></td>
@@ -857,6 +1096,8 @@
     renderInvoiceTable();
     wireLineItems();
     wireUploadOnce();
+    updateDashboard();
+    updateApprovals();
     log("Booted.");
   });
 })();

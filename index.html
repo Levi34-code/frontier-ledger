@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Frontier Ledger - Accounts Payable Automation</title>
+    <link rel="icon" type="image/png" href="assets/favicon.png" />
     <link rel="stylesheet" href="style.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -113,7 +114,7 @@
             <div class="kpi-change">No data yet</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-label">Exceptions</div>
+            <div class="kpi-label">Issues</div>
             <div class="kpi-value">—</div>
             <div class="kpi-change">No data yet</div>
           </div>
@@ -127,21 +128,25 @@
         <div class="dashboard-content">
           <div class="dashboard-section">
             <h2>Recent Activity</h2>
-            <div
-              class="text-center"
-              style="padding: 16px; color: var(--sagebrush); font-weight: 600"
-            >
-              No activity yet
+            <div id="recent-activity">
+              <div
+                class="text-center"
+                style="padding: 16px; color: var(--sagebrush); font-weight: 600"
+              >
+                No activity yet
+              </div>
             </div>
           </div>
 
           <div class="dashboard-section">
             <h2>AP Aging Summary</h2>
-            <div
-              class="text-center"
-              style="padding: 24px; color: var(--sagebrush); font-weight: 600"
-            >
-              No aging data yet
+            <div id="aging-summary">
+              <div
+                class="text-center"
+                style="padding: 24px; color: var(--sagebrush); font-weight: 600"
+              >
+                No aging data yet
+              </div>
             </div>
           </div>
         </div>
@@ -177,8 +182,8 @@
             >
               Waiting Approval (0)
             </button>
-            <button class="filter-chip" onclick="filterStatus('Exception')">
-              Exceptions (0)
+            <button class="filter-chip" onclick="filterStatus('Issue')">
+              Issues (0)
             </button>
             <button class="filter-chip" onclick="filterStatus('Ready to Pay')">
               Ready to Pay (0)
@@ -313,6 +318,7 @@
                     <th>Description</th>
                     <th>GL Account</th>
                     <th>Cost Center</th>
+                    <th>Approver</th>
                     <th>Quantity</th>
                     <th>Unit Price</th>
                     <th>Total</th>
@@ -489,6 +495,7 @@
                     <th>Description</th>
                     <th>GL Account</th>
                     <th>Cost Center</th>
+                    <th>Approver</th>
                     <th>Qty</th>
                     <th>Unit Price</th>
                     <th>Total</th>
@@ -517,6 +524,13 @@
                         class="form-input-sm"
                         placeholder="e.g., ADMIN"
                       />
+                    </td>
+                    <td>
+                      <select class="form-input-sm">
+                        <option value="John Doe" selected>John Doe (You)</option>
+                        <option value="Jane Smith">Jane Smith (CFO)</option>
+                        <option value="Mike Johnson">Mike Johnson (Controller)</option>
+                      </select>
                     </td>
                     <td>
                       <input
@@ -593,11 +607,29 @@
           </div>
         </div>
         <div class="approval-list">
-          <div
-            class="text-center"
-            style="color: var(--sagebrush); padding: 16px"
-          >
-            No approvals pending
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Invoice #</th>
+                  <th>Vendor</th>
+                  <th>Amount</th>
+                  <th>Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="approvals-body">
+                <tr>
+                  <td
+                    colspan="5"
+                    class="text-center"
+                    style="color: var(--sagebrush)"
+                  >
+                    No approvals pending
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
@@ -925,6 +957,9 @@
         </div>
       </section>
     </main>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container"></div>
 
     <!-- Single App Script ONLY -->
     <script src="js/app.js"></script>
