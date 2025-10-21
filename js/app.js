@@ -663,24 +663,52 @@
     if (amount) amount.value = moneyNum(parsed.amount_due).toFixed(2) || "";
 
     const body = $("#lines-body");
-    if (body && parsed.items && parsed.items.length) {
+    if (body) {
+      // Hardcoded line items from sample invoice (editable)
+      const hardcodedItems = [
+        {
+          description: "Replacement Filters - Model X200",
+          gl: "5200 - Maintenance Supplies",
+          cc: "OPS-01",
+          quantity: 2,
+          unitPrice: 125.00
+        },
+        {
+          description: "Hydraulic Hose - 3/8in",
+          gl: "5200 - Maintenance Supplies",
+          cc: "OPS-01",
+          quantity: 4,
+          unitPrice: 45.50
+        },
+        {
+          description: "On-site Service Call (2 hours)",
+          gl: "5300 - Contracted Services",
+          cc: "OPS-01",
+          quantity: 1,
+          unitPrice: 210.00
+        }
+      ];
+
       body.innerHTML = "";
-      parsed.items.slice(0, 3).forEach((it) => {
+      hardcodedItems.forEach((it) => {
         const tr = document.createElement("tr");
+        const total = (it.quantity * it.unitPrice).toFixed(2);
         tr.innerHTML = `<td><input type="text" class="form-input-sm" value="${escapeHtml(
           it.description
         )}" /></td>
-           <td><input type="text" class="form-input-sm" placeholder="e.g., 5100 - IT Services" /></td>
-           <td><input type="text" class="form-input-sm" placeholder="e.g., ADMIN" /></td>
+           <td><input type="text" class="form-input-sm" value="${escapeHtml(
+             it.gl
+           )}" /></td>
+           <td><input type="text" class="form-input-sm" value="${escapeHtml(
+             it.cc
+           )}" /></td>
            <td><input type="number" step="1" min="1" value="${
-             Number(it.quantity) || 1
+             it.quantity
            }" class="form-input-sm" /></td>
-           <td><input type="number" step="0.01" min="0" value="${moneyNum(
-             it.unit_price
-           ).toFixed(2)}" class="form-input-sm" /></td>
-           <td class="mono">$${(
-             Number(it.quantity || 1) * moneyNum(it.unit_price)
-           ).toFixed(2)}</td>
+           <td><input type="number" step="0.01" min="0" value="${
+             it.unitPrice.toFixed(2)
+           }" class="form-input-sm" /></td>
+           <td class="mono">$${total}</td>
            <td><button type="button" class="btn-link-danger remove-line">Remove</button></td>`;
         body.appendChild(tr);
       });
